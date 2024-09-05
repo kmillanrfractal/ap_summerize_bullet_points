@@ -4,9 +4,11 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.schema import Document
 from langchain.prompts import PromptTemplate
+import time
+from langchain_community.callbacks import get_openai_callback
 
 
-def stuff_model(doc, model_name="gpt-4o-mini"):
+def stuff_model(doc, prompt, model_name="gpt-4o-mini"):
     doc = Document(page_content=doc)
 
     llm = ChatOpenAI(model=model_name)
@@ -15,33 +17,8 @@ def stuff_model(doc, model_name="gpt-4o-mini"):
 
     prompt = PromptTemplate(
         input_variables=["context"],
-        template="""You are an expert news summarizer who can summarize print articles for a radio audience. 
-            The style should be narrative and catchy for an audience on the go. 
-            This means no sentence should require repetition to understand.
-
-            ##Writing Style##:
-            a) DO NOT use sensational language. Begin with a catchy sentence that can convey the latest news on its own.    
-            b) The first sentence of the summary, if isolated, should stand on its own as a complete story that requires no further explanation.
-
-            ##Limits##:
-            a) The article can have NO less than 120 words and NO more than 150 words.
-            b) NO sentence should have more than 20 words.
-            c) DO NOT use long clauses in sentences:
-            d)  ALWAYS include the titles or descriptors people, organizations and locations are most known for. But use the minimum number of words in titles and/or descriptors
-            e) NEVER miss adding, in the second sentence, the day of the week the story was reported. However, do not begin the summary with when it happened. Also, do not use relative terms like last week or yesterday to convey when the main event happened:
-            f) Do not add the specific date of occurrence of the main event. The day of the week is enough:
-            g) A sentence should have NO more than 2 clauses:
-            h) DO NOT cite or quote entities that do not contribute to the main story. Identify the most important who, what, when, where, why, and how and use those details to craft the summary:
-
-            ##Quotes##:
-            a) Do not use long or multi-sentence quotes. Pick the sentence that does not require additional clarification:    
-            b) NEVER place source attribution at the end of a quote or sentence. Start the sentence with an attribution or incorporate it mid-sentence:
-            
-            ##Tense##:
-            a) Use a present-tense lede whenever possible – it should sound current or forward-looking. Describe any ongoing or current situation in the present tense.
-            b) DO NOT use the present tense to describe a momentary situation that will soon be outdated.
-            c) Use past tense when the event occurred at a specific moment in the past.
-            d) Use present perfect tense when the event happened recently and is still relevant to the present moment
+        template=prompt
+        + """
 
             Now summarize the next article: 
             
@@ -52,9 +29,14 @@ def stuff_model(doc, model_name="gpt-4o-mini"):
     # Instantiate chain
     chain = create_stuff_documents_chain(llm, prompt)
 
-    # Invoke chain
-    result = chain.invoke({"context": [doc]})
-    print(result)
+    with get_openai_callback() as cb:
+        start_time = time.time()  # Start timing
+        # Invoke chain
+        result = chain.invoke({"context": [doc]})
+        end_time = time.time()  # End timing
+        execution_time = end_time - start_time  # Calculate total execution time
+
+    return result, execution_time, cb.total_cost
 
 
 if __name__ == "__main__":
